@@ -1,0 +1,10 @@
+.git/
+.vs/
+Assert/
+Log/
+bin/
+obj/
+Submodule/
+*.sln
+*.vcxproj
+*.vcxproj.user
