@@ -8,14 +8,17 @@
 
 #include <iostream>
 
+#include "Log.h"
+
 void InitWindow()
 {
 
 }
 
+
 int main()
 {
-
+    Log::Error("test msg");
 
     return 0;
 }
