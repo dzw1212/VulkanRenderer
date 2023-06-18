@@ -1,26 +1,33 @@
 workspace "VulkanRenderer"
+    architecture "x64"
     configurations { "Debug", "Release" }
 
 project "VulkanRenderer"
     kind "ConsoleApp"
     language "C++"
+    cppdialect "c++latest"
 
     targetdir "bin/%{cfg.buildcfg}"
 
-    architecture "x64"
+    
 
     files
     {
-        "./Source/*.h", 
-        "./Source/*.cpp",
+        "./Source/**.h", 
+        "./Source/**.cpp",
     }
 
-    libdirs { "D:/VulkanSDK/Lib" } --附加库目录
+    libdirs --附加库目录
+    {
+        "D:/VulkanSDK/Lib",
+        "./Submodule/ImGui/bin/Debug"
+    } 
 
     links --附加依赖项
     {
         "vulkan-1.lib",
-        "glfw3.lib"
+        "glfw3.lib",
+        "ImGui.lib"
     }
 
     includedirs --外部包含目录
@@ -28,13 +35,16 @@ project "VulkanRenderer"
         "./Submodule/GLFW/include",
         "./Submodule/glm",
         "./Submodule/spdlog/include",
+        "./Submodule/ImGui",
         "D:/VulkanSDK/Include",
     }
 
+    include "./SubModule/ImGui"
+
     filter "configurations:Debug"
-        defines { "DEBUG" }
+        defines "DEBUG"
         symbols "On"
 
     filter "configurations:Release"
-        defines { "NDEBUG" }
+        defines "NDEBUG"
         optimize "On"
