@@ -15,11 +15,14 @@ VulkanRenderer::VulkanRenderer()
 	m_bEnableValidationLayer = true;
 #endif
 
-	m_uiWindowWidth = 1920;
-	m_uiWindowHeight = 1080;
+	m_uiWindowWidth = 800;
+	m_uiWindowHeight = 600;
 	m_strWindowTitle = "Vulkan Renderer";
 
-	Init();
+	m_mapShaderPath = {
+		{ VK_SHADER_STAGE_VERTEX_BIT,	"./Assert/Shader/vert.spv" },
+		{ VK_SHADER_STAGE_FRAGMENT_BIT,	"./Assert/Shader/frag.spv" },
+	};
 }
 
 VulkanRenderer::~VulkanRenderer()
@@ -38,6 +41,7 @@ void VulkanRenderer::Init()
 	CreateSwapChainImageViews();
 	CreateRenderPass();
 	CreateDescriptorSetLayout();
+	CreateDescriptorPool();
 }
 
 void VulkanRenderer::Loop()
@@ -45,6 +49,10 @@ void VulkanRenderer::Loop()
 }
 
 void VulkanRenderer::Clean()
+{
+}
+
+void VulkanRenderer::LoadModel(const std::filesystem::path& modelPath)
 {
 }
 
@@ -326,6 +334,8 @@ void VulkanRenderer::QueryAllValidPhysicalDevice()
 			vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &uiExtensionCount, info.vecAvaliableDeviceExtensions.data());
 		}
 
+		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &info.memoryProperties);
+
 		info.nRateScore = RatePhysicalDevice(info);
 
 		m_mapPhysicalDeviceInfo[physicalDevice] = info;
@@ -567,14 +577,17 @@ VkImageView VulkanRenderer::CreateImageView(VkImage image, VkFormat format, VkIm
 	return imageView;
 }
 
-void VulkanRenderer::CreateSwapChainImageViews()
+void VulkanRenderer::CreateSwapChainImages()
 {
 	UINT uiImageCount = 0;
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_SwapChain, &uiImageCount, nullptr);
-	//ASSERT(uiImageCount > 0, "Find no image in swap chain");
+	ASSERT(uiImageCount > 0, "Find no image in swap chain");
 	m_vecSwapChainImages.resize(uiImageCount);
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_SwapChain, &uiImageCount, m_vecSwapChainImages.data());
+}
 
+void VulkanRenderer::CreateSwapChainImageViews()
+{
 	m_vecSwapChainImageViews.resize(m_vecSwapChainImages.size());
 	for (UINT i = 0; i < m_vecSwapChainImageViews.size(); ++i)
 	{
@@ -609,6 +622,7 @@ VkFormat VulkanRenderer::ChooseDepthFormat(const VkImageTiling& tiling, const Vk
 	}
 
 	ASSERT(false, "No support depth format");
+	return VK_FORMAT_D32_SFLOAT_S8_UINT;
 }
 
 void VulkanRenderer::CreateRenderPass()
@@ -679,6 +693,117 @@ void VulkanRenderer::CreateRenderPass()
 	VULKAN_ASSERT(vkCreateRenderPass(m_LogicalDevice, &renderPassCreateInfo, nullptr, &m_RenderPass), "Create render pass failed");
 }
 
+std::vector<char> VulkanRenderer::ReadShaderFile(const std::filesystem::path& filepath)
+{
+	ASSERT(std::filesystem::exists(filepath), std::format("Shader file path {} not exist", filepath.string()));
+	//光标置于文件末尾，方便统计长度
+	std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+	ASSERT(file.is_open(), std::format("Open shader file {} failed", filepath.string()));
+
+	//tellg获取当前文件读写位置
+	size_t fileSize = static_cast<size_t>(file.tellg());
+	std::vector<char> vecBuffer(fileSize);
+
+	//指针回到文件开头
+	file.seekg(0);
+	file.read(vecBuffer.data(), fileSize);
+
+	file.close();
+	return vecBuffer;
+}
+
+VkShaderModule VulkanRenderer::CreateShaderModule(const std::vector<char>& vecBytecode)
+{
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = vecBytecode.size();
+	createInfo.pCode = reinterpret_cast<const UINT*>(vecBytecode.data());
+
+	VkShaderModule shaderModule;
+	VULKAN_ASSERT(vkCreateShaderModule(m_LogicalDevice, &createInfo, nullptr, &shaderModule), "Create shader module failed");
+
+	return shaderModule;
+}
+
+void VulkanRenderer::CreateShader()
+{
+	m_mapShaderModule.clear();
+
+	ASSERT(m_mapShaderPath.size() > 0, "Detect no shader spv file");
+
+	for (const auto& spvPath : m_mapShaderPath)
+	{
+		auto shaderModule = CreateShaderModule(ReadShaderFile(spvPath.second));
+
+		m_mapShaderModule[spvPath.first] = shaderModule;
+	}
+}
+
+UINT VulkanRenderer::FindSuitableMemoryTypeIndex(UINT typeFilter, VkMemoryPropertyFlags properties)
+{
+	auto iter = m_mapPhysicalDeviceInfo.find(m_PhysicalDevice);
+	ASSERT(iter != m_mapPhysicalDeviceInfo.end(), "Find no physical device info");
+
+	const auto& memoryProperties = iter->second.memoryProperties;
+
+	for (UINT i = 0; i < memoryProperties.memoryTypeCount; ++i)
+	{
+		if (typeFilter & (1 << i))
+		{
+			if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+				return i;
+		}
+	}
+
+	ASSERT(false, "Find no suitable memory type");
+}
+
+void VulkanRenderer::CreateBuffer(VkDeviceSize deviceSize, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags propertyFlags, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+{
+	VkBufferCreateInfo BufferCreateInfo{};
+	BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	BufferCreateInfo.size = deviceSize;	//要创建的Buffer的大小
+	BufferCreateInfo.usage = usageFlags;	//使用目的，比如用作VertexBuffer或IndexBuffer或其他
+	BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; //Buffer可以被多个QueueFamily共享，这里选择独占模式
+	BufferCreateInfo.flags = 0;	//用来配置缓存的内存稀疏程度，0为默认值
+
+	VULKAN_ASSERT(vkCreateBuffer(m_LogicalDevice, &BufferCreateInfo, nullptr, &buffer), "Create buffer failed");
+
+	//MemoryRequirements的参数如下：
+	//memoryRequirements.size			所需内存的大小
+	//memoryRequirements.alignment		所需内存的对齐方式，由Buffer的usage和flags参数决定
+	//memoryRequirements.memoryTypeBits 适合该Buffer的内存类型（位值）
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(m_LogicalDevice, buffer, &memoryRequirements);
+	
+	VkMemoryAllocateInfo memoryAllocInfo{};
+	memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocInfo.allocationSize = memoryRequirements.size;
+	//显卡可以不同类型的内存，不同类型的内存所允许的操作与效率各不相同，需要根据需求寻找最适合的内存类型
+	memoryAllocInfo.memoryTypeIndex = FindSuitableMemoryTypeIndex(memoryRequirements.memoryTypeBits, propertyFlags);
+
+	VULKAN_ASSERT(vkAllocateMemory(m_LogicalDevice, &memoryAllocInfo, nullptr, &bufferMemory), "Allocate buffer memory failed");
+
+	vkBindBufferMemory(m_LogicalDevice, buffer, bufferMemory, 0);
+}
+
+void VulkanRenderer::CreateUniformBuffers()
+{
+	VkDeviceSize uniformBufferSize = sizeof(UniformBufferObject);
+
+	m_vecUniformBuffers.resize(m_vecSwapChainImages.size());
+	m_vecUniformBufferMemories.resize(m_vecSwapChainImages.size());
+
+	//为并行渲染的每一帧图像创建独立的Uniform Buffer
+	for (size_t i = 0; i < m_vecSwapChainImages.size(); ++i)
+	{
+		CreateBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			m_vecUniformBuffers[i], m_vecUniformBufferMemories[i]);
+	}
+}
+
 void VulkanRenderer::CreateDescriptorSetLayout()
 {
 	//UniformBufferObject Binding
@@ -704,7 +829,7 @@ void VulkanRenderer::CreateDescriptorSetLayout()
 
 	VkDescriptorSetLayoutCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	createInfo.bindingCount = static_cast<uint32_t>(vecDescriptorLayoutBinding.size());
+	createInfo.bindingCount = static_cast<UINT>(vecDescriptorLayoutBinding.size());
 	createInfo.pBindings = vecDescriptorLayoutBinding.data();
 
 	VULKAN_ASSERT(vkCreateDescriptorSetLayout(m_LogicalDevice, &createInfo, nullptr, &m_DescriptorSetLayout), "Create descriptor layout failed");
@@ -715,12 +840,12 @@ void VulkanRenderer::CreateDescriptorPool()
 	//ubo
 	VkDescriptorPoolSize uboPoolSize{};
 	uboPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboPoolSize.descriptorCount = static_cast<uint32_t>(m_vecSwapChainImages.size());
+	uboPoolSize.descriptorCount = static_cast<UINT>(m_vecSwapChainImages.size());
 
 	//sampler
 	VkDescriptorPoolSize samplerPoolSize{};
 	samplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerPoolSize.descriptorCount = static_cast<uint32_t>(m_vecSwapChainImages.size());
+	samplerPoolSize.descriptorCount = static_cast<UINT>(m_vecSwapChainImages.size());
 
 	std::vector<VkDescriptorPoolSize> vecPoolSize = {
 		uboPoolSize,
@@ -729,12 +854,68 @@ void VulkanRenderer::CreateDescriptorPool()
 
 	VkDescriptorPoolCreateInfo poolCreateInfo{};
 	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolCreateInfo.poolSizeCount = static_cast<uint32_t>(vecPoolSize.size());
+	poolCreateInfo.poolSizeCount = static_cast<UINT>(vecPoolSize.size());
 	poolCreateInfo.pPoolSizes = vecPoolSize.data();
-	poolCreateInfo.maxSets = static_cast<uint32_t>(m_vecSwapChainImages.size());
+	poolCreateInfo.maxSets = static_cast<UINT>(m_vecSwapChainImages.size());
 
-	VkResult res = vkCreateDescriptorPool(m_LogicalDevice, &poolCreateInfo, nullptr, &m_DescriptorPool);
-	if (res != VK_SUCCESS)
-		throw std::runtime_error("Create Descriptor Pool Failed");
+	VULKAN_ASSERT(vkCreateDescriptorPool(m_LogicalDevice, &poolCreateInfo, nullptr, &m_DescriptorPool), "Create descriptor pool failed");
 }
+
+void VulkanRenderer::CreateDescriptorSets()
+{
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorSetCount = static_cast<UINT>(m_vecSwapChainImages.size());
+	allocInfo.descriptorPool = m_DescriptorPool;
+
+	std::vector<VkDescriptorSetLayout> vecDupDescriptorSetLayout(m_vecSwapChainImages.size(), m_DescriptorSetLayout);
+	allocInfo.pSetLayouts = vecDupDescriptorSetLayout.data();
+
+	m_vecDescriptorSets.resize(m_vecSwapChainImages.size());
+	VkResult res = vkAllocateDescriptorSets(m_LogicalDevice, &allocInfo, m_vecDescriptorSets.data());
+	if (res != VK_SUCCESS)
+		throw std::runtime_error("Allocate Descriptor Sets Failed");
+
+	for (size_t i = 0; i < m_vecSwapChainImages.size(); ++i)
+	{
+		//ubo
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = m_vecUniformBuffers[i];
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(UniformBufferObject);
+
+		VkWriteDescriptorSet uboWrite{};
+		uboWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		uboWrite.dstSet = m_vecDescriptorSets[i];
+		uboWrite.dstBinding = 0;
+		uboWrite.dstArrayElement = 0;
+		uboWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uboWrite.descriptorCount = 1;
+		uboWrite.pBufferInfo = &bufferInfo;
+
+		//sampler
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView = m_TextureImageView;
+		imageInfo.sampler = m_TextureSampler;
+
+		VkWriteDescriptorSet samplerWrite{};
+		samplerWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		samplerWrite.dstSet = m_vecDescriptorSets[i];
+		samplerWrite.dstBinding = 1;
+		samplerWrite.dstArrayElement = 0;
+		samplerWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		samplerWrite.descriptorCount = 1;
+		samplerWrite.pImageInfo = &imageInfo;
+
+		std::vector<VkWriteDescriptorSet> vecDescriptorWrite = {
+			uboWrite,
+			samplerWrite,
+		};
+
+		vkUpdateDescriptorSets(m_LogicalDevice, static_cast<uint32_t>(vecDescriptorWrite.size()), vecDescriptorWrite.data(), 0, nullptr);
+	}
+}
+
+
 

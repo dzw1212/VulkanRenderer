@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <format>
+#include <optional>
 
 using UCHAR = unsigned char;
 using UINT = uint32_t;
