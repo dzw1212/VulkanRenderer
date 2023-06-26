@@ -7,6 +7,10 @@
 #include <algorithm>
 #include <format>
 #include <optional>
+#include <filesystem>
+#include <fstream>
+
+#include "Log.h"
 
 using UCHAR = unsigned char;
 using UINT = uint32_t;

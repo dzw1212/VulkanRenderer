@@ -9,19 +9,17 @@ project "VulkanRenderer"
 
     targetdir "bin/%{cfg.buildcfg}"
 
-    
-
     files
     {
-        "./Source/**.h", 
-        "./Source/**.cpp",
+        "./Source/*.h",
+        "./Source/*.cpp",
     }
 
     libdirs --附加库目录
     {
         "D:/VulkanSDK/Lib",
         "./Submodule/ImGui/bin/Debug"
-    } 
+    }
 
     links --附加依赖项
     {
@@ -36,6 +34,8 @@ project "VulkanRenderer"
         "./Submodule/glm",
         "./Submodule/spdlog/include",
         "./Submodule/ImGui",
+        "./Submodule/tinygltf",
+        "./Submodule/tinyobjloader",
         "D:/VulkanSDK/Include",
     }
 
