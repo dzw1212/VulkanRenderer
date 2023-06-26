@@ -7,19 +7,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Log.h" />
-    <ClInclude Include="Source\UI\UI.h">
-      <Filter>UI</Filter>
-    </ClInclude>
     <ClInclude Include="Source\VulkanRenderer.h" />
-    <ClInclude Include="Source\core.h" />
+    <ClInclude Include="Source\Core.h" />
+    <ClInclude Include="Source\glTFLoader.h" />
+    <ClInclude Include="Source\Camera.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Log.cpp" />
-    <ClCompile Include="Source\UI\UI.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
     <ClCompile Include="Source\VulkanRenderer.cpp" />
     <ClCompile Include="Source\main.cpp" />
-    <ClCompile Include="Source\UI\ImGuiBuild.cpp" />
+    <ClCompile Include="Source\glTFLoader.cpp" />
+    <ClCompile Include="Source\Camera.cpp" />
   </ItemGroup>
 </Project>
