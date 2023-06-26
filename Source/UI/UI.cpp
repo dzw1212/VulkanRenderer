@@ -5,6 +5,7 @@
 #include "examples/imgui_impl_vulkan.h"
 #include <stdio.h>          // printf, fprintf
 #include <stdlib.h>         // abort
+
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -106,7 +107,6 @@ void UI::Init(VulkanRenderer& renderer)
 
 void UI::Tick()
 {
-    /*
     // Resize swap chain?
     if (g_SwapChainRebuild && g_SwapChainResizeWidth > 0 && g_SwapChainResizeHeight > 0)
     {
@@ -176,7 +176,6 @@ void UI::Tick()
     // Present Main Platform Window
     if (!main_is_minimized)
         FramePresent(wd);
-    */
 }
 
 void UI::Clean()

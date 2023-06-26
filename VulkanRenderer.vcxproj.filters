@@ -7,12 +7,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Log.h" />
+    <ClInclude Include="Source\UI\UI.h">
+      <Filter>UI</Filter>
+    </ClInclude>
     <ClInclude Include="Source\VulkanRenderer.h" />
     <ClInclude Include="Source\core.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Log.cpp" />
+    <ClCompile Include="Source\UI\UI.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
     <ClCompile Include="Source\VulkanRenderer.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\UI\ImGuiBuild.cpp" />
   </ItemGroup>
 </Project>
