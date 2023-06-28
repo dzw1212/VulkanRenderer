@@ -239,7 +239,7 @@ private:
 	void Render();
 
 public:
-	static Camera m_Camera;
+	Camera m_Camera;
 	void SetupCamera();
 
 private:

@@ -152,8 +152,11 @@ void VulkanRenderer::Clean()
 	vkFreeMemory(m_LogicalDevice, m_VertexBufferMemory, nullptr);
 	vkDestroyBuffer(m_LogicalDevice, m_VertexBuffer, nullptr);
 
-	vkFreeMemory(m_LogicalDevice, m_IndexBufferMemory, nullptr);
-	vkDestroyBuffer(m_LogicalDevice, m_IndexBuffer, nullptr);
+	if (m_Indices.size() > 0)
+	{
+		vkFreeMemory(m_LogicalDevice, m_IndexBufferMemory, nullptr);
+		vkDestroyBuffer(m_LogicalDevice, m_IndexBuffer, nullptr);
+	}
 
 	for (int i = 0; i < m_vecSwapChainImages.size(); ++i)
 	{
@@ -1836,9 +1839,12 @@ void VulkanRenderer::SetupCamera()
 	m_Camera.SetViewportSize(static_cast<float>(m_SwapChainExtent2D.width), static_cast<float>(m_SwapChainExtent2D.height));
 	m_Camera.SetWindow(m_pWindow);
 
+	glfwSetWindowUserPointer(m_pWindow, (void*)&m_Camera);
+
 	glfwSetScrollCallback(m_pWindow, [](GLFWwindow* window, double dOffsetX, double dOffsetY)
 		{
-			m_Camera.OnMouseScroll(dOffsetX, dOffsetY);
+			auto& camera = *(Camera*)glfwGetWindowUserPointer(window);
+			camera.OnMouseScroll(dOffsetX, dOffsetY);
 		}
 	);
 }
@@ -1944,6 +1950,8 @@ void VulkanRenderer::UpdateUniformBuffer(UINT uiIdx)
 
 void VulkanRenderer::Render()
 {
+	m_Camera.Tick();
+
 	//等待fence的值变为signaled
 	vkWaitForFences(m_LogicalDevice, 1, &m_vecInFlightFences[m_uiCurFrameIdx], VK_TRUE, UINT64_MAX);
 

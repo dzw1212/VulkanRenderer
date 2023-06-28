@@ -46,7 +46,7 @@ void Camera::Tick()
 }
 void Camera::OnMouseScroll(double offsetX, double offsetY)
 {
-	float fDelta = offsetY * 0.1f;
+	float fDelta = offsetY * 0.3f;
 	MouseZoom(fDelta);
 	UpdateView();
 }
