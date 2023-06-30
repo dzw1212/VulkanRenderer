@@ -72,7 +72,6 @@ public:
 	VulkanRenderer();
 	~VulkanRenderer();
 
-
 	void Init();
 	void Loop();
 	void Clean();
@@ -242,6 +241,17 @@ public:
 	Camera m_Camera;
 	void SetupCamera();
 
+	GLFWwindow* GetWindow() { return m_pWindow; }
+	VkInstance& GetInstance() { return m_Instance; }
+	VkPhysicalDevice& GetPhysicalDevice() { return m_PhysicalDevice; }
+	VkDevice& GetLogicalDevice() { return m_LogicalDevice; }
+	UINT GetGraphicQueueIdx() { return m_mapPhysicalDeviceInfo.at(m_PhysicalDevice).graphicFamilyIdx.value(); }
+	VkQueue& GetGraphicQueue() { return m_GraphicQueue; }
+	VkDescriptorPool& GetDescriptorPool() { return m_DescriptorPool; }
+	UINT GetSwapChainMinImageCount() { return m_uiSwapChainMinImageCount; }
+	UINT GetSwapChainImageCount() { return static_cast<UINT>(m_vecSwapChainImages.size()); }
+	VkRenderPass& GetRenderPass() { return m_RenderPass; }
+
 private:
 	UINT m_uiWindowWidth;
 	UINT m_uiWindowHeight;
@@ -279,6 +289,7 @@ private:
 	VkFormat m_SwapChainFormat;
 	VkPresentModeKHR m_SwapChainPresentMode;
 	VkExtent2D m_SwapChainExtent2D;
+	UINT m_uiSwapChainMinImageCount;
 
 	std::vector<VkImage> m_vecSwapChainImages;
 	std::vector<VkImageView> m_vecSwapChainImageViews;

@@ -1,9 +1,12 @@
 #include "core.h"
 #include "VulkanRenderer.h"
 #include "Log.h"
+#include "UI/UI.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include "glm/glm.hpp"
+#include "glm/detail/type_vec3.hpp"
 #include "glm/vec4.hpp"
 #include "glm/mat4x4.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -17,6 +20,8 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+
+static UI g_UI;
 
 VulkanRenderer::VulkanRenderer()
 {
@@ -91,6 +96,8 @@ void VulkanRenderer::Init()
 	CreateGraphicPipeline();
 
 	SetupCamera();
+
+	g_UI.Init(*this);
 }
 
 void VulkanRenderer::Loop()
@@ -182,6 +189,8 @@ void VulkanRenderer::Clean()
 
 	vkDestroyInstance(m_Instance, nullptr);
 
+	g_UI.Clean();
+
 	glfwDestroyWindow(m_pWindow);
 	glfwTerminate();
 }
@@ -262,6 +271,7 @@ void VulkanRenderer::LoadGLTF(const std::filesystem::path& modelPath)
 				point.pos.z = positions[i * 3 + 2];
 
 				point.color = { 1.0, 0.0, 0.0 };
+
 				m_Vertices.push_back(point);
 			}
 		}
@@ -807,12 +817,12 @@ void VulkanRenderer::CreateSwapChain()
 	m_SwapChainFormat = m_SwapChainSurfaceFormat.format;
 	m_SwapChainPresentMode = ChooseSwapChainPresentMode(physicalDeviceInfo.swapChainSupportInfo.vecPresentModes);
 	m_SwapChainExtent2D = ChooseSwapChainSwapExtent(physicalDeviceInfo.swapChainSupportInfo.capabilities);
-	UINT uiImageCount = ChooseSwapChainImageCount(physicalDeviceInfo.swapChainSupportInfo.capabilities);
+	m_uiSwapChainMinImageCount = ChooseSwapChainImageCount(physicalDeviceInfo.swapChainSupportInfo.capabilities);
 
 	VkSwapchainCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = m_WindowSurface;
-	createInfo.minImageCount = uiImageCount;
+	createInfo.minImageCount = m_uiSwapChainMinImageCount;
 	createInfo.imageFormat = m_SwapChainFormat;
 	createInfo.imageColorSpace = m_SwapChainSurfaceFormat.colorSpace;
 	createInfo.imageExtent = m_SwapChainExtent2D;
@@ -1982,6 +1992,8 @@ void VulkanRenderer::Render()
 
 	vkResetCommandBuffer(m_vecCommandBuffers[m_uiCurFrameIdx], 0);
 	RecordCommandBuffer(m_vecCommandBuffers[m_uiCurFrameIdx], uiImageIdx);
+
+	g_UI.Tick();
 
 	UpdateUniformBuffer(m_uiCurFrameIdx);
 

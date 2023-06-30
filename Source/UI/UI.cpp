@@ -11,15 +11,7 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 
-UI::UI()
-{
-
-}
-
-UI::~UI()
-{
-
-}
+#include "../VulkanRenderer.h"
 
 static void check_vk_result(VkResult err)
 {
@@ -30,12 +22,14 @@ static void check_vk_result(VkResult err)
         abort();
 }
 
-void UI::Init(VulkanRenderer& renderer)
+void UI::Init(const VulkanRenderer& renderer)
 {
-    // Setup Dear ImGui context
+    m_Renderer = renderer;
+
+    //设置ImGui上下文
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
@@ -43,7 +37,7 @@ void UI::Init(VulkanRenderer& renderer)
     //io.ConfigViewportsNoAutoMerge = true;
     //io.ConfigViewportsNoTaskBarIcon = true;
 
-    // Setup Dear ImGui style
+    //设置ImGui风格
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsClassic();
 
@@ -55,9 +49,22 @@ void UI::Init(VulkanRenderer& renderer)
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    // Setup Platform/Renderer bindings
-    //ImGui_ImplGlfw_InitForVulkan(pWindow, true);
-    //ImGui_ImplVulkan_Init(&initInfo, windowInfo.RenderPass);
+    //绑定window与m_Renderer
+    ImGui_ImplGlfw_InitForVulkan(m_Renderer.GetWindow(), true);
+
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = m_Renderer.GetInstance();
+    init_info.PhysicalDevice = m_Renderer.GetPhysicalDevice();
+    init_info.Device = m_Renderer.GetLogicalDevice();
+    init_info.QueueFamily = m_Renderer.GetGraphicQueueIdx();
+    init_info.Queue = m_Renderer.GetGraphicQueue();
+    init_info.PipelineCache = VK_NULL_HANDLE; //todo:PipelineCache是否需要
+    init_info.DescriptorPool = m_Renderer.GetDescriptorPool();
+    init_info.Allocator = VK_NULL_HANDLE; //todo:Allocator是否需要
+    init_info.MinImageCount = m_Renderer.GetSwapChainMinImageCount();
+    init_info.ImageCount = m_Renderer.GetSwapChainImageCount();
+    init_info.CheckVkResultFn = check_vk_result;
+    ImGui_ImplVulkan_Init(&init_info, m_Renderer.GetRenderPass());
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -66,11 +73,11 @@ void UI::Init(VulkanRenderer& renderer)
     // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
+    io.Fonts->AddFontDefault();
+    io.Fonts->AddFontFromFileTTF("./Submodule/ImGui/misc/fonts/Roboto-Medium.ttf", 16.0f);
+    io.Fonts->AddFontFromFileTTF("./Submodule/ImGui/misc/fonts/Cousine-Regular.ttf", 15.0f);
+    io.Fonts->AddFontFromFileTTF("./Submodule/ImGui/misc/fonts/DroidSans.ttf", 16.0f);
+    io.Fonts->AddFontFromFileTTF("./Submodule/ImGui/misc/fonts/ProggyTiny.ttf", 10.0f);
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != NULL);
 
@@ -105,21 +112,25 @@ void UI::Init(VulkanRenderer& renderer)
     //}
 }
 
-void UI::Tick()
+void UI::Render()
 {
     // Resize swap chain?
-    if (g_SwapChainRebuild && g_SwapChainResizeWidth > 0 && g_SwapChainResizeHeight > 0)
-    {
-        g_SwapChainRebuild = false;
-        ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
-        ImGui_ImplVulkanH_CreateOrResizeWindow(g_Instance, g_PhysicalDevice, g_Device, &g_MainWindowData, g_QueueFamily, g_Allocator, g_SwapChainResizeWidth, g_SwapChainResizeHeight, g_MinImageCount);
-        g_MainWindowData.FrameIndex = 0;
-    }
+    //if (g_SwapChainRebuild && g_SwapChainResizeWidth > 0 && g_SwapChainResizeHeight > 0)
+    //{
+    //    g_SwapChainRebuild = false;
+    //    ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
+    //    ImGui_ImplVulkanH_CreateOrResizeWindow(g_Instance, g_PhysicalDevice, g_Device, &g_MainWindowData, g_QueueFamily, g_Allocator, g_SwapChainResizeWidth, g_SwapChainResizeHeight, g_MinImageCount);
+    //    g_MainWindowData.FrameIndex = 0;
+    //}
 
     // Start the Dear ImGui frame
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    static bool show_demo_window = true;
+    static bool show_another_window = true;
+    glm::vec3 clear_color = { 0.f, 0.f, 0.f };
 
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
     if (show_demo_window)
@@ -162,20 +173,48 @@ void UI::Tick()
     ImGui::Render();
     ImDrawData* main_draw_data = ImGui::GetDrawData();
     const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
-    memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
     if (!main_is_minimized)
-        FrameRender(wd, main_draw_data);
+    {
+        {
+            VkRenderPassBeginInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            info.renderPass = wd->RenderPass;
+            info.framebuffer = fd->Framebuffer;
+            info.renderArea.extent.width = wd->Width;
+            info.renderArea.extent.height = wd->Height;
+            info.clearValueCount = 1;
+            info.pClearValues = &wd->ClearValue;
+            vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+        }
+
+        // Record dear imgui primitives into command buffer
+        ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
+
+        // Submit command buffer
+        vkCmdEndRenderPass(fd->CommandBuffer);
+        {
+            VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            VkSubmitInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            info.waitSemaphoreCount = 1;
+            info.pWaitSemaphores = &image_acquired_semaphore;
+            info.pWaitDstStageMask = &wait_stage;
+            info.commandBufferCount = 1;
+            info.pCommandBuffers = &fd->CommandBuffer;
+            info.signalSemaphoreCount = 1;
+            info.pSignalSemaphores = &render_complete_semaphore;
+
+            err = vkEndCommandBuffer(fd->CommandBuffer);
+        }
+    }
 
     // Update and Render additional Platform Windows
+    ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
     }
-
-    // Present Main Platform Window
-    if (!main_is_minimized)
-        FramePresent(wd);
 }
 
 void UI::Clean()
@@ -183,6 +222,4 @@ void UI::Clean()
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-
-    //ImGui_ImplVulkanH_DestroyWindow(g_Instance, g_Device, &g_MainWindowData, g_Allocator);
 }

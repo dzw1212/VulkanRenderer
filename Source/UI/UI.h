@@ -1,17 +1,18 @@
 #pragma once
 
 struct VulkanRenderer;
+struct VkCommandBuffer;
 
 class UI
 {
 public:
-	UI();
-	~UI();
+	UI() = default;
 
-	void Init(VulkanRenderer& renderer);
-	void Tick();
+	void Init(const VulkanRenderer& renderer);
+	void Render(VkCommandBuffer& commandBuffer);
+	void Present();
 	void Clean();
 
 private:
-
+	VulkanRenderer m_Renderer;
 };
