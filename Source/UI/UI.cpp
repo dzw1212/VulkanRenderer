@@ -48,7 +48,7 @@ void UI::Init(VulkanRenderer& renderer)
     VULKAN_ASSERT(vkCreateDescriptorPool(renderer.GetLogicalDevice(), &pool_info, nullptr, &g_DescriptorPool), "Create ImGui descriptor pool failed");
 
     VkAttachmentDescription attachment = {};
-    attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attachment.format = renderer.GetUISwapChainFormat();
     attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;

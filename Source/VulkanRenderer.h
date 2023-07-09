@@ -174,6 +174,8 @@ private:
 	UINT ChooseSwapChainImageCount(const VkSurfaceCapabilitiesKHR& capabilities);
 	void CreateSwapChain();
 
+	VkSurfaceFormatKHR ChooseUISwapChainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& vecAvailableFormats);
+
 	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, UINT uiMipLevel);
 	void CreateSwapChainImages();
 	void CreateSwapChainImageViews();
@@ -267,6 +269,8 @@ public:
 
 	VkPipeline& GetPipeline() { return m_GraphicPipeline; }
 
+	VkFormat GetUISwapChainFormat() { return m_UISwapChainFormat; }
+
 private:
 	UINT m_uiWindowWidth;
 	UINT m_uiWindowHeight;
@@ -312,6 +316,8 @@ private:
 	VkSwapchainKHR m_UISwapChain;
 	std::vector<VkImage> m_vecUISwapChainImages;
 	std::vector<VkImageView> m_vecUISwapChainImageViews;
+	VkSurfaceFormatKHR m_UISwapChainSurfaceFormat;
+	VkFormat m_UISwapChainFormat;
 
 	VkImage m_DepthImage;
 	VkDeviceMemory m_DepthImageMemory;

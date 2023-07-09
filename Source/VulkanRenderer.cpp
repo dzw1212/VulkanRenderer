@@ -776,6 +776,22 @@ VkSurfaceFormatKHR VulkanRenderer::ChooseSwapChainSurfaceFormat(const std::vecto
 	return vecAvailableFormats[0];
 }
 
+VkSurfaceFormatKHR VulkanRenderer::ChooseUISwapChainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& vecAvailableFormats)
+{
+	ASSERT(vecAvailableFormats.size() > 0, "No avaliable UI swap chain surface format");
+
+	//找到支持UNORM格式的format，如果没有则返回第一个
+	for (const auto& format : vecAvailableFormats)
+	{
+		if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			return format;
+		}
+	}
+
+	return vecAvailableFormats[0];
+}
+
 VkPresentModeKHR VulkanRenderer::ChooseSwapChainPresentMode(const std::vector<VkPresentModeKHR>& vecAvailableModes)
 {
 	ASSERT(vecAvailableModes.size() > 0, "No avaliable swap chain present mode");
@@ -863,12 +879,15 @@ void VulkanRenderer::CreateSwapChain()
 
 	//----------------------------------------------------
 
+	m_UISwapChainSurfaceFormat = ChooseUISwapChainSurfaceFormat(physicalDeviceInfo.swapChainSupportInfo.vecSurfaceFormats);
+	m_UISwapChainFormat = m_UISwapChainSurfaceFormat.format;
+
 	VkSwapchainCreateInfoKHR createInfoUI{};
 	createInfoUI .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfoUI .surface = m_WindowSurface;
 	createInfoUI .minImageCount = m_uiSwapChainMinImageCount;
-	createInfoUI .imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
-	createInfoUI .imageColorSpace = m_SwapChainSurfaceFormat.colorSpace;
+	createInfoUI .imageFormat = m_UISwapChainSurfaceFormat.format;
+	createInfoUI .imageColorSpace = m_UISwapChainSurfaceFormat.colorSpace;
 	createInfoUI .imageExtent = m_SwapChainExtent2D;
 	createInfoUI .imageArrayLayers = 1;
 	createInfoUI .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -924,7 +943,7 @@ void VulkanRenderer::CreateSwapChainImages()
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_UISwapChain, &uiImageCount, nullptr);
 	ASSERT(uiImageCount > 0, "Find no image in UI swap chain");
 	m_vecUISwapChainImages.resize(uiImageCount);
-	vkGetSwapchainImagesKHR(m_LogicalDevice, m_SwapChain, &uiImageCount, m_vecUISwapChainImages.data());
+	vkGetSwapchainImagesKHR(m_LogicalDevice, m_UISwapChain, &uiImageCount, m_vecUISwapChainImages.data());
 }
 
 void VulkanRenderer::CreateSwapChainImageViews()
@@ -938,7 +957,7 @@ void VulkanRenderer::CreateSwapChainImageViews()
 	m_vecUISwapChainImageViews.resize(m_vecUISwapChainImages.size());
 	for (UINT i = 0; i < m_vecUISwapChainImageViews.size(); ++i)
 	{
-		m_vecUISwapChainImageViews[i] = CreateImageView(m_vecUISwapChainImages[i], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+		m_vecUISwapChainImageViews[i] = CreateImageView(m_vecUISwapChainImages[i], VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
 }
 
@@ -2072,8 +2091,8 @@ void VulkanRenderer::Render()
 	submitInfo.pWaitDstStageMask = waitStages;
 
 	std::vector<VkCommandBuffer> commandBuffers = {
-		m_vecCommandBuffers[m_uiCurFrameIdx],
 		uiCommandBuffer,
+		m_vecCommandBuffers[m_uiCurFrameIdx],
 	};
 	submitInfo.commandBufferCount = static_cast<UINT>(commandBuffers.size());
 	submitInfo.pCommandBuffers = commandBuffers.data();
@@ -2093,12 +2112,17 @@ void VulkanRenderer::Render()
 	presentInfo.pWaitSemaphores = signalSemaphore;
 
 	std::vector<VkSwapchainKHR> vecSwapChains = {
-		m_SwapChain,
 		m_UISwapChain,
+		m_SwapChain,
+	};
+
+	std::vector<UINT> vecImageIndices = {
+		uiImageIdx,
+		uiImageIdx,
 	};
 	presentInfo.swapchainCount = static_cast<UINT>(vecSwapChains.size());
 	presentInfo.pSwapchains = vecSwapChains.data();
-	presentInfo.pImageIndices = &uiImageIdx;
+	presentInfo.pImageIndices = vecImageIndices.data();
 	presentInfo.pResults = nullptr;
 
 	res = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
