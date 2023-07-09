@@ -1,6 +1,5 @@
 #include "VulkanRenderer.h"
 
-
 int main()
 {
     VulkanRenderer renderer;

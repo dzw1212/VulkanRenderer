@@ -1,18 +1,23 @@
 #pragma once
 
-struct VulkanRenderer;
-struct VkCommandBuffer;
+#define GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#include "../Core.h"
+
+class VulkanRenderer;
 
 class UI
 {
 public:
 	UI() = default;
 
-	void Init(const VulkanRenderer& renderer);
-	void Render(VkCommandBuffer& commandBuffer);
-	void Present();
+	void Init(VulkanRenderer& renderer);
+	VkCommandBuffer& FillCommandBuffer(VulkanRenderer& renderer, UINT uiIdx);
+	void Render_Begin();
+	void Render_End();
 	void Clean();
 
-private:
-	VulkanRenderer m_Renderer;
+	void testSameRenderPass(VkCommandBuffer& commandBuffer);
 };

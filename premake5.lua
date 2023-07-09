@@ -11,8 +11,10 @@ project "VulkanRenderer"
 
     files
     {
-        "./Source/*.h",
-        "./Source/*.cpp",
+        "./Source/**.h",
+        "./Source/**.cpp",
+        "./Submodule/ImGui/*.h",
+        "./Submodule/ImGui/*.cpp",
     }
 
     libdirs --附加库目录
@@ -25,7 +27,7 @@ project "VulkanRenderer"
     {
         "vulkan-1.lib",
         "glfw3.lib",
-        "ImGui.lib"
+        --"ImGui.lib"
     }
 
     includedirs --外部包含目录
@@ -39,7 +41,7 @@ project "VulkanRenderer"
         "D:/VulkanSDK/Include",
     }
 
-    include "./SubModule/ImGui"
+    --include "./SubModule/ImGui"
 
     filter "configurations:Debug"
         defines "DEBUG"

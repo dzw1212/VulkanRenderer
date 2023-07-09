@@ -72,6 +72,8 @@ public:
 	VulkanRenderer();
 	~VulkanRenderer();
 
+	VulkanRenderer& operator=(const VulkanRenderer& other) { return *this; }
+
 	void Init();
 	void Loop();
 	void Clean();
@@ -237,6 +239,8 @@ private:
 	void UpdateUniformBuffer(UINT uiIdx);
 	void Render();
 
+	void RecreateSwapChain();
+
 public:
 	Camera m_Camera;
 	void SetupCamera();
@@ -250,7 +254,18 @@ public:
 	VkDescriptorPool& GetDescriptorPool() { return m_DescriptorPool; }
 	UINT GetSwapChainMinImageCount() { return m_uiSwapChainMinImageCount; }
 	UINT GetSwapChainImageCount() { return static_cast<UINT>(m_vecSwapChainImages.size()); }
-	VkRenderPass& GetRenderPass() { return m_RenderPass; }
+
+	VkExtent2D& GetSwapChainExtent2D() { return m_SwapChainExtent2D; }
+
+	VkImageView& GetUISwapChainImageView(UINT uiIdx) { return m_vecUISwapChainImageViews[uiIdx]; }
+
+	VkCommandPool& GetTransferCommandPool() { return m_TransferCommandPool; }
+	VkCommandBuffer BeginSingleTimeCommandBuffer() { return BeginSingleTimeCommand(); }
+	void EndSingleTimeCommandBuffer(VkCommandBuffer commandBuffer) { return EndSingleTimeCommand(commandBuffer); }
+
+	VkFormat GetSwapChainFormat() { return m_SwapChainFormat; }
+
+	VkPipeline& GetPipeline() { return m_GraphicPipeline; }
 
 private:
 	UINT m_uiWindowWidth;
@@ -293,6 +308,10 @@ private:
 
 	std::vector<VkImage> m_vecSwapChainImages;
 	std::vector<VkImageView> m_vecSwapChainImageViews;
+
+	VkSwapchainKHR m_UISwapChain;
+	std::vector<VkImage> m_vecUISwapChainImages;
+	std::vector<VkImageView> m_vecUISwapChainImageViews;
 
 	VkImage m_DepthImage;
 	VkDeviceMemory m_DepthImageMemory;

@@ -1,7 +1,6 @@
-#include "core.h"
+#include "Core.h"
 #include "VulkanRenderer.h"
 #include "Log.h"
-#include "UI/UI.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -21,7 +20,10 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#include "imgui.h"
+#include "UI/UI.h"
 static UI g_UI;
+
 
 VulkanRenderer::VulkanRenderer()
 {
@@ -35,12 +37,16 @@ VulkanRenderer::VulkanRenderer()
 	m_uiWindowHeight = 1080;
 	m_strWindowTitle = "Vulkan Renderer";
 
+	m_bFrameBufferResized = false;
+
 	m_mapShaderPath = {
 		{ VK_SHADER_STAGE_VERTEX_BIT,	"./Assert/Shader/vert.spv" },
 		{ VK_SHADER_STAGE_FRAGMENT_BIT,	"./Assert/Shader/frag.spv" },
 	};
 
-	m_TexturePath = "./Assert/Texture/viking_room.png";
+	//m_TexturePath = "./Assert/Texture/Earth/8081_earthmap4k.jpg";
+	m_TexturePath = "./Assert/Texture/Earth2/8k_earth_daymap.jpg";
+	//m_TexturePath = "./Assert/Texture/Earth2/8k_earth_clouds.jpg";
 
 	m_ModelPath = "./Assert/Model/viking_room.obj";
 
@@ -105,6 +111,7 @@ void VulkanRenderer::Loop()
 	while (!glfwWindowShouldClose(m_pWindow))
 	{
 		glfwPollEvents();
+		g_UI.Render_Begin();
 		Render();
 	}
 
@@ -188,8 +195,6 @@ void VulkanRenderer::Clean()
 	vkDestroyDevice(m_LogicalDevice, nullptr);
 
 	vkDestroyInstance(m_Instance, nullptr);
-
-	g_UI.Clean();
 
 	glfwDestroyWindow(m_pWindow);
 	glfwTerminate();
@@ -787,6 +792,9 @@ VkPresentModeKHR VulkanRenderer::ChooseSwapChainPresentMode(const std::vector<Vk
 
 VkExtent2D VulkanRenderer::ChooseSwapChainSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 {
+	if (capabilities.currentExtent.width != std::numeric_limits<UINT>::max())
+		return capabilities.currentExtent;
+
 	int nWidth = 0;
 	int nHeight = 0;
 	glfwGetFramebufferSize(m_pWindow, &nWidth, &nHeight);
@@ -801,7 +809,7 @@ VkExtent2D VulkanRenderer::ChooseSwapChainSwapExtent(const VkSurfaceCapabilities
 
 UINT VulkanRenderer::ChooseSwapChainImageCount(const VkSurfaceCapabilitiesKHR& capabilities)
 {
-	uint32_t uiImageCount = capabilities.minImageCount + 1;
+	UINT uiImageCount = capabilities.minImageCount + 1;
 	if (capabilities.maxImageCount > 0)
 	{
 		uiImageCount = std::clamp(uiImageCount, capabilities.minImageCount, capabilities.maxImageCount);
@@ -816,7 +824,11 @@ void VulkanRenderer::CreateSwapChain()
 	m_SwapChainSurfaceFormat = ChooseSwapChainSurfaceFormat(physicalDeviceInfo.swapChainSupportInfo.vecSurfaceFormats);
 	m_SwapChainFormat = m_SwapChainSurfaceFormat.format;
 	m_SwapChainPresentMode = ChooseSwapChainPresentMode(physicalDeviceInfo.swapChainSupportInfo.vecPresentModes);
-	m_SwapChainExtent2D = ChooseSwapChainSwapExtent(physicalDeviceInfo.swapChainSupportInfo.capabilities);
+
+	VkSurfaceCapabilitiesKHR capabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_WindowSurface, &capabilities);
+	m_SwapChainExtent2D = ChooseSwapChainSwapExtent(capabilities);
+
 	m_uiSwapChainMinImageCount = ChooseSwapChainImageCount(physicalDeviceInfo.swapChainSupportInfo.capabilities);
 
 	VkSwapchainCreateInfoKHR createInfo{};
@@ -848,6 +860,38 @@ void VulkanRenderer::CreateSwapChain()
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VULKAN_ASSERT(vkCreateSwapchainKHR(m_LogicalDevice, &createInfo, nullptr, &m_SwapChain), "Create swap chain failed");
+
+	//----------------------------------------------------
+
+	VkSwapchainCreateInfoKHR createInfoUI{};
+	createInfoUI .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	createInfoUI .surface = m_WindowSurface;
+	createInfoUI .minImageCount = m_uiSwapChainMinImageCount;
+	createInfoUI .imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+	createInfoUI .imageColorSpace = m_SwapChainSurfaceFormat.colorSpace;
+	createInfoUI .imageExtent = m_SwapChainExtent2D;
+	createInfoUI .imageArrayLayers = 1;
+	createInfoUI .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	createInfoUI .presentMode = m_SwapChainPresentMode;
+
+	//挑选显卡时已确保GraphicFamily与PresentFamily一致
+	createInfoUI.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	createInfoUI.queueFamilyIndexCount = 0;
+	createInfoUI.pQueueFamilyIndices = nullptr;
+
+	//设置如何进行Transform
+	createInfoUI.preTransform = physicalDeviceInfo.swapChainSupportInfo.capabilities.currentTransform; //不做任何Transform
+
+	//设置是否启用Alpha通道
+	createInfoUI.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; //不启用Alpha通道
+
+	//设置是否启用隐藏面剔除
+	createInfoUI.clipped = VK_TRUE;
+
+	//oldSwapChain用于window resize时
+	createInfoUI.oldSwapchain = VK_NULL_HANDLE;
+
+	VULKAN_ASSERT(vkCreateSwapchainKHR(m_LogicalDevice, &createInfoUI, nullptr, &m_UISwapChain), "Create UI swap chain failed");
 }
 
 VkImageView VulkanRenderer::CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, UINT uiMipLevel)
@@ -876,6 +920,11 @@ void VulkanRenderer::CreateSwapChainImages()
 	ASSERT(uiImageCount > 0, "Find no image in swap chain");
 	m_vecSwapChainImages.resize(uiImageCount);
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_SwapChain, &uiImageCount, m_vecSwapChainImages.data());
+
+	vkGetSwapchainImagesKHR(m_LogicalDevice, m_UISwapChain, &uiImageCount, nullptr);
+	ASSERT(uiImageCount > 0, "Find no image in UI swap chain");
+	m_vecUISwapChainImages.resize(uiImageCount);
+	vkGetSwapchainImagesKHR(m_LogicalDevice, m_SwapChain, &uiImageCount, m_vecUISwapChainImages.data());
 }
 
 void VulkanRenderer::CreateSwapChainImageViews()
@@ -884,6 +933,12 @@ void VulkanRenderer::CreateSwapChainImageViews()
 	for (UINT i = 0; i < m_vecSwapChainImageViews.size(); ++i)
 	{
 		m_vecSwapChainImageViews[i] = CreateImageView(m_vecSwapChainImages[i], m_SwapChainFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+	}
+
+	m_vecUISwapChainImageViews.resize(m_vecUISwapChainImages.size());
+	for (UINT i = 0; i < m_vecUISwapChainImageViews.size(); ++i)
+	{
+		m_vecUISwapChainImageViews[i] = CreateImageView(m_vecUISwapChainImages[i], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
 }
 
@@ -970,7 +1025,8 @@ void VulkanRenderer::CreateRenderPass()
 	attachmentDescriptions[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachmentDescriptions[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachmentDescriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; //初始布局不重要
-	attachmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; //适用于present的布局
+	//attachmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; //适用于present的布局
+	attachmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; //让UI的renderpass负责present
 
 	VkAttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 0;
@@ -1643,7 +1699,7 @@ void VulkanRenderer::CreateGraphicPipeline()
 	/****************************可编程管线*******************************/
 
 	ASSERT(m_mapShaderModule.find(VK_SHADER_STAGE_VERTEX_BIT) != m_mapShaderModule.end(), "No vertex shader module");
-	ASSERT(m_mapShaderModule.find(VK_SHADER_STAGE_VERTEX_BIT) != m_mapShaderModule.end(), "No vertex shader module");
+	ASSERT(m_mapShaderModule.find(VK_SHADER_STAGE_FRAGMENT_BIT) != m_mapShaderModule.end(), "No fragment shader module");
 
 	VkPipelineShaderStageCreateInfo vertShaderStageCreateInfo{};
 	vertShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1677,7 +1733,6 @@ void VulkanRenderer::CreateGraphicPipeline()
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<UINT>(vecDynamicStates.size());
 		dynamicStateCreateInfo.pDynamicStates = vecDynamicStates.data();
 	}
-	
 
 	//-----------------------Vertex Input State--------------------------//
 	auto bindingDescription = Vertex3D::GetBindingDescription();
@@ -1853,6 +1908,8 @@ void VulkanRenderer::SetupCamera()
 
 	glfwSetScrollCallback(m_pWindow, [](GLFWwindow* window, double dOffsetX, double dOffsetY)
 		{
+			if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+				return;
 			auto& camera = *(Camera*)glfwGetWindowUserPointer(window);
 			camera.OnMouseScroll(dOffsetX, dOffsetY);
 		}
@@ -1960,7 +2017,8 @@ void VulkanRenderer::UpdateUniformBuffer(UINT uiIdx)
 
 void VulkanRenderer::Render()
 {
-	m_Camera.Tick();
+	if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemActive())
+		m_Camera.Tick();
 
 	//等待fence的值变为signaled
 	vkWaitForFences(m_LogicalDevice, 1, &m_vecInFlightFences[m_uiCurFrameIdx], VK_TRUE, UINT64_MAX);
@@ -1974,7 +2032,7 @@ void VulkanRenderer::Render()
 		{
 			//SwapChain与WindowSurface不兼容，无法继续渲染
 			//一般发生在window尺寸改变时
-			//recreateSwapChain();
+			RecreateSwapChain();
 			return;
 		}
 		else if (res == VK_SUBOPTIMAL_KHR)
@@ -1990,10 +2048,13 @@ void VulkanRenderer::Render()
 	//重设fence为unsignaled
 	vkResetFences(m_LogicalDevice, 1, &m_vecInFlightFences[m_uiCurFrameIdx]);
 
+	//auto uiCommandBuffer = g_UI.FillCommandBuffer(*this, m_uiCurFrameIdx);
+
 	vkResetCommandBuffer(m_vecCommandBuffers[m_uiCurFrameIdx], 0);
+
 	RecordCommandBuffer(m_vecCommandBuffers[m_uiCurFrameIdx], uiImageIdx);
 
-	g_UI.Tick();
+	auto uiCommandBuffer = g_UI.FillCommandBuffer(*this, m_uiCurFrameIdx);
 
 	UpdateUniformBuffer(m_uiCurFrameIdx);
 
@@ -2010,8 +2071,12 @@ void VulkanRenderer::Render()
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &m_vecCommandBuffers[m_uiCurFrameIdx];
+	std::vector<VkCommandBuffer> commandBuffers = {
+		m_vecCommandBuffers[m_uiCurFrameIdx],
+		uiCommandBuffer,
+	};
+	submitInfo.commandBufferCount = static_cast<UINT>(commandBuffers.size());
+	submitInfo.pCommandBuffers = commandBuffers.data();
 
 	VkSemaphore signalSemaphore[] = {
 		m_vecRenderFinishedSemaphores[m_uiCurFrameIdx],
@@ -2027,11 +2092,12 @@ void VulkanRenderer::Render()
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pWaitSemaphores = signalSemaphore;
 
-	VkSwapchainKHR swapChains[] = {
+	std::vector<VkSwapchainKHR> vecSwapChains = {
 		m_SwapChain,
+		m_UISwapChain,
 	};
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = swapChains;
+	presentInfo.swapchainCount = static_cast<UINT>(vecSwapChains.size());
+	presentInfo.pSwapchains = vecSwapChains.data();
 	presentInfo.pImageIndices = &uiImageIdx;
 	presentInfo.pResults = nullptr;
 
@@ -2040,7 +2106,7 @@ void VulkanRenderer::Render()
 	{
 		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || m_bFrameBufferResized)
 		{
-			//recreateSwapChain();
+			RecreateSwapChain();
 			m_bFrameBufferResized = false;
 		}
 		else
@@ -2050,6 +2116,54 @@ void VulkanRenderer::Render()
 	}
 
 	m_uiCurFrameIdx = (m_uiCurFrameIdx + 1) % static_cast<UINT>(m_vecSwapChainImages.size());
+}
+
+void VulkanRenderer::RecreateSwapChain()
+{
+	//特殊处理窗口最小化的情况
+	int nWidth = 0;
+	int nHeight = 0;
+	glfwGetFramebufferSize(m_pWindow, &nWidth, &nHeight);
+	while (nWidth == 0 || nHeight == 0)
+	{
+		glfwGetFramebufferSize(m_pWindow, &nWidth, &nHeight);
+		glfwWaitEvents();
+	}
+
+	//等待资源结束占用
+	vkDeviceWaitIdle(m_LogicalDevice);
+
+	vkDestroyImageView(m_LogicalDevice, m_DepthImageView, nullptr);
+	vkDestroyImage(m_LogicalDevice, m_DepthImage, nullptr);
+	vkFreeMemory(m_LogicalDevice, m_DepthImageMemory, nullptr);
+
+	for (const auto& frameBuffer : m_vecSwapChainFrameBuffers)
+	{
+		vkDestroyFramebuffer(m_LogicalDevice, frameBuffer, nullptr);
+	}
+
+	for (const auto& imageView : m_vecSwapChainImageViews)
+	{
+		vkDestroyImageView(m_LogicalDevice, imageView, nullptr);
+	}
+
+	//for (const auto& image : m_vecSwapChainImages)
+	//{
+	//	vkDestroyImage(m_LogicalDevice, image, nullptr);
+	//}
+
+	//清理SwapChain
+	vkDestroySwapchainKHR(m_LogicalDevice, m_SwapChain, nullptr);
+
+	CreateSwapChain();
+	CreateRenderPass();
+
+	CreateSwapChainImages();
+	CreateSwapChainImageViews();
+	CreateSwapChainFrameBuffers();
+	
+	CreateGraphicPipeline();
+
 }
 
 
