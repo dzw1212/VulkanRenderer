@@ -227,10 +227,12 @@ void UI::Draw()
     ImGui::End();
 
     ImGui::Begin("Physical Device");
-    ImGui::Text("Name: "); ImGui::SameLine(); ImGui::Text("%s", g_PhysicalDeviceInfo.properties.deviceName);
-    ImGui::Text("Type: "); ImGui::SameLine(); ImGui::Text("%d", g_PhysicalDeviceInfo.properties.deviceType);
-    
+    ImGui::Text("Name: %s", g_PhysicalDeviceInfo.properties.deviceName);
+    ImGui::Text("Type: %s", g_PhysicalDeviceInfo.strDeviceTypeName.c_str());
+    ImGui::End();
 
+    ImGui::Begin("Stat");
+    ImGui::Text("FPS: %d", m_pRenderer->GetFPS());
     ImGui::End();
 }
 

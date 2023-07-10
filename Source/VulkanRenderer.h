@@ -77,6 +77,8 @@ struct PhysicalDeviceInfo
 
 	int nRateScore;
 
+	std::string strDeviceTypeName;
+
 	std::optional<UINT> graphicFamilyIdx;
 	std::optional<UINT> presentFamilyIdx;
 
@@ -246,6 +248,11 @@ private:
 public:
 	Camera m_Camera;
 	void SetupCamera();
+
+	UINT m_uiFPS;
+	UINT m_uiFrameCounter;
+	UINT GetFPS() { return m_uiFPS; }
+
 
 	GLFWwindow* GetWindow() { return m_pWindow; }
 	VkInstance& GetInstance() { return m_Instance; }

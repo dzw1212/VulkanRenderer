@@ -1,6 +1,9 @@
 #include "Core.h"
 #include "VulkanRenderer.h"
+#include "VulkanUtils.h"
 #include "Log.h"
+
+#include <chrono>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -56,6 +59,9 @@ VulkanRenderer::VulkanRenderer()
 	m_bViewportAndScissorIsDynamic = false;
 
 	m_uiCurFrameIdx = 0;
+
+	m_uiFPS = 0;
+	m_uiFrameCounter = 0;
 }
 
 VulkanRenderer::~VulkanRenderer()
@@ -112,8 +118,20 @@ void VulkanRenderer::Loop()
 	while (!glfwWindowShouldClose(m_pWindow))
 	{
 		glfwPollEvents();
-		g_UI.StartNewFrame();
+
+		static std::chrono::time_point<std::chrono::high_resolution_clock> lastTimestamp = std::chrono::high_resolution_clock::now();
+
 		Render();
+
+		auto nowTimestamp = std::chrono::high_resolution_clock::now();
+
+		float fpsTimer = (float)(std::chrono::duration<double, std::milli>(nowTimestamp - lastTimestamp).count());
+		if (fpsTimer > 1000.0f)
+		{
+			m_uiFPS = static_cast<uint32_t>((float)m_uiFrameCounter * (1000.0f / fpsTimer));
+			m_uiFrameCounter = 0;
+			lastTimestamp = nowTimestamp;
+		}
 	}
 
 	//等待GPU将当前的命令执行完成，资源未被占用时才能销毁
@@ -591,6 +609,8 @@ void VulkanRenderer::QueryAllValidPhysicalDevice()
 			info.vecQueueFamilies.resize(uiQueueFamilyCount);
 			vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &uiQueueFamilyCount, info.vecQueueFamilies.data());
 		}
+
+		info.strDeviceTypeName = VulkanUtils::GetPhysicalDeviceTypeName(info.properties.deviceType);
 
 		int nIdx = 0;
 		for (const auto& queueFamily : info.vecQueueFamilies)
@@ -1993,8 +2013,12 @@ void VulkanRenderer::UpdateUniformBuffer(UINT uiIdx)
 
 void VulkanRenderer::Render()
 {
+	m_uiFrameCounter++;
+
 	if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemActive())
 		m_Camera.Tick();
+
+	g_UI.StartNewFrame();
 
 	//等待fence的值变为signaled
 	vkWaitForFences(m_LogicalDevice, 1, &m_vecInFlightFences[m_uiCurFrameIdx], VK_TRUE, UINT64_MAX);
