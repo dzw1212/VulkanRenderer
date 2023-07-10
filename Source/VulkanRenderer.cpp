@@ -45,8 +45,9 @@ VulkanRenderer::VulkanRenderer()
 	};
 
 	//m_TexturePath = "./Assert/Texture/Earth/8081_earthmap4k.jpg";
-	m_TexturePath = "./Assert/Texture/Earth2/8k_earth_daymap.jpg";
+	//m_TexturePath = "./Assert/Texture/Earth2/8k_earth_daymap.jpg";
 	//m_TexturePath = "./Assert/Texture/Earth2/8k_earth_clouds.jpg";
+	m_TexturePath = "./Assert/Texture/viking_room.png";
 
 	m_ModelPath = "./Assert/Model/viking_room.obj";
 
@@ -103,7 +104,7 @@ void VulkanRenderer::Init()
 
 	SetupCamera();
 
-	g_UI.Init(*this);
+	g_UI.Init(this);
 }
 
 void VulkanRenderer::Loop()
@@ -111,7 +112,7 @@ void VulkanRenderer::Loop()
 	while (!glfwWindowShouldClose(m_pWindow))
 	{
 		glfwPollEvents();
-		g_UI.Render_Begin();
+		g_UI.StartNewFrame();
 		Render();
 	}
 
@@ -121,6 +122,8 @@ void VulkanRenderer::Loop()
 
 void VulkanRenderer::Clean()
 {
+	g_UI.Clean();
+
 	for (const auto& shaderModule : m_mapShaderModule)
 	{
 		vkDestroyShaderModule(m_LogicalDevice, shaderModule.second, nullptr);
@@ -876,41 +879,6 @@ void VulkanRenderer::CreateSwapChain()
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VULKAN_ASSERT(vkCreateSwapchainKHR(m_LogicalDevice, &createInfo, nullptr, &m_SwapChain), "Create swap chain failed");
-
-	//----------------------------------------------------
-
-	m_UISwapChainSurfaceFormat = ChooseUISwapChainSurfaceFormat(physicalDeviceInfo.swapChainSupportInfo.vecSurfaceFormats);
-	m_UISwapChainFormat = m_UISwapChainSurfaceFormat.format;
-
-	VkSwapchainCreateInfoKHR createInfoUI{};
-	createInfoUI .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	createInfoUI .surface = m_WindowSurface;
-	createInfoUI .minImageCount = m_uiSwapChainMinImageCount;
-	createInfoUI .imageFormat = m_UISwapChainSurfaceFormat.format;
-	createInfoUI .imageColorSpace = m_UISwapChainSurfaceFormat.colorSpace;
-	createInfoUI .imageExtent = m_SwapChainExtent2D;
-	createInfoUI .imageArrayLayers = 1;
-	createInfoUI .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	createInfoUI .presentMode = m_SwapChainPresentMode;
-
-	//挑选显卡时已确保GraphicFamily与PresentFamily一致
-	createInfoUI.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	createInfoUI.queueFamilyIndexCount = 0;
-	createInfoUI.pQueueFamilyIndices = nullptr;
-
-	//设置如何进行Transform
-	createInfoUI.preTransform = physicalDeviceInfo.swapChainSupportInfo.capabilities.currentTransform; //不做任何Transform
-
-	//设置是否启用Alpha通道
-	createInfoUI.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; //不启用Alpha通道
-
-	//设置是否启用隐藏面剔除
-	createInfoUI.clipped = VK_TRUE;
-
-	//oldSwapChain用于window resize时
-	createInfoUI.oldSwapchain = VK_NULL_HANDLE;
-
-	VULKAN_ASSERT(vkCreateSwapchainKHR(m_LogicalDevice, &createInfoUI, nullptr, &m_UISwapChain), "Create UI swap chain failed");
 }
 
 VkImageView VulkanRenderer::CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, UINT uiMipLevel)
@@ -939,11 +907,6 @@ void VulkanRenderer::CreateSwapChainImages()
 	ASSERT(uiImageCount > 0, "Find no image in swap chain");
 	m_vecSwapChainImages.resize(uiImageCount);
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_SwapChain, &uiImageCount, m_vecSwapChainImages.data());
-
-	vkGetSwapchainImagesKHR(m_LogicalDevice, m_UISwapChain, &uiImageCount, nullptr);
-	ASSERT(uiImageCount > 0, "Find no image in UI swap chain");
-	m_vecUISwapChainImages.resize(uiImageCount);
-	vkGetSwapchainImagesKHR(m_LogicalDevice, m_UISwapChain, &uiImageCount, m_vecUISwapChainImages.data());
 }
 
 void VulkanRenderer::CreateSwapChainImageViews()
@@ -952,12 +915,6 @@ void VulkanRenderer::CreateSwapChainImageViews()
 	for (UINT i = 0; i < m_vecSwapChainImageViews.size(); ++i)
 	{
 		m_vecSwapChainImageViews[i] = CreateImageView(m_vecSwapChainImages[i], m_SwapChainFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-	}
-
-	m_vecUISwapChainImageViews.resize(m_vecUISwapChainImages.size());
-	for (UINT i = 0; i < m_vecUISwapChainImageViews.size(); ++i)
-	{
-		m_vecUISwapChainImageViews[i] = CreateImageView(m_vecUISwapChainImages[i], VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
 }
 
@@ -1043,7 +1000,7 @@ void VulkanRenderer::CreateRenderPass()
 	attachmentDescriptions[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE; //RenderPass结束后保留其内容用来present
 	attachmentDescriptions[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachmentDescriptions[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachmentDescriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; //初始布局不重要
+	attachmentDescriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	//attachmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; //适用于present的布局
 	attachmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; //让UI的renderpass负责present
 
@@ -2073,7 +2030,7 @@ void VulkanRenderer::Render()
 
 	RecordCommandBuffer(m_vecCommandBuffers[m_uiCurFrameIdx], uiImageIdx);
 
-	auto uiCommandBuffer = g_UI.FillCommandBuffer(*this, m_uiCurFrameIdx);
+	auto uiCommandBuffer = g_UI.FillCommandBuffer(m_uiCurFrameIdx);
 
 	UpdateUniformBuffer(m_uiCurFrameIdx);
 
@@ -2091,8 +2048,8 @@ void VulkanRenderer::Render()
 	submitInfo.pWaitDstStageMask = waitStages;
 
 	std::vector<VkCommandBuffer> commandBuffers = {
-		uiCommandBuffer,
 		m_vecCommandBuffers[m_uiCurFrameIdx],
+		uiCommandBuffer,
 	};
 	submitInfo.commandBufferCount = static_cast<UINT>(commandBuffers.size());
 	submitInfo.pCommandBuffers = commandBuffers.data();
@@ -2112,12 +2069,10 @@ void VulkanRenderer::Render()
 	presentInfo.pWaitSemaphores = signalSemaphore;
 
 	std::vector<VkSwapchainKHR> vecSwapChains = {
-		m_UISwapChain,
 		m_SwapChain,
 	};
 
 	std::vector<UINT> vecImageIndices = {
-		uiImageIdx,
 		uiImageIdx,
 	};
 	presentInfo.swapchainCount = static_cast<UINT>(vecSwapChains.size());

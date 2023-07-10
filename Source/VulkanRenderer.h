@@ -53,6 +53,48 @@ struct Vertex3D
 	}
 };
 
+struct SwapChainSupportInfo
+{
+	VkSurfaceCapabilitiesKHR capabilities;	//SwapChain容量相关信息
+	std::vector<VkSurfaceFormatKHR> vecSurfaceFormats;	//支持哪些图像格式
+	std::vector<VkPresentModeKHR> vecPresentModes;	//支持哪些表现模式，如二缓、三缓等
+};
+
+struct PhysicalDeviceInfo
+{
+	PhysicalDeviceInfo()
+	{
+		nRateScore = 0;
+		graphicFamilyIdx = std::nullopt;
+		presentFamilyIdx = std::nullopt;
+	}
+
+	VkPhysicalDeviceProperties properties;
+	VkPhysicalDeviceFeatures features;
+	std::vector<VkQueueFamilyProperties> vecQueueFamilies;
+
+	std::vector<VkExtensionProperties> vecAvaliableDeviceExtensions;
+
+	int nRateScore;
+
+	std::optional<UINT> graphicFamilyIdx;
+	std::optional<UINT> presentFamilyIdx;
+
+	bool HaveGraphicAndPresentQueueFamily()
+	{
+		return graphicFamilyIdx.has_value() && presentFamilyIdx.has_value();
+	}
+
+	bool IsGraphicAndPresentQueueFamilySame()
+	{
+		return HaveGraphicAndPresentQueueFamily() && (graphicFamilyIdx == presentFamilyIdx);
+	}
+
+	SwapChainSupportInfo swapChainSupportInfo;
+
+	VkPhysicalDeviceMemoryProperties memoryProperties;
+};
+
 namespace std
 {
 	template<> struct hash<Vertex3D>
@@ -118,48 +160,6 @@ private:
 
 	void CreateWindowSurface();
 
-
-	struct SwapChainSupportInfo
-	{
-		VkSurfaceCapabilitiesKHR capabilities;	//SwapChain容量相关信息
-		std::vector<VkSurfaceFormatKHR> vecSurfaceFormats;	//支持哪些图像格式
-		std::vector<VkPresentModeKHR> vecPresentModes;	//支持哪些表现模式，如二缓、三缓等
-	};
-
-	struct PhysicalDeviceInfo
-	{
-		PhysicalDeviceInfo()
-		{
-			nRateScore = 0;
-			graphicFamilyIdx = std::nullopt;
-			presentFamilyIdx = std::nullopt;
-		}
-
-		VkPhysicalDeviceProperties properties;
-		VkPhysicalDeviceFeatures features;
-		std::vector<VkQueueFamilyProperties> vecQueueFamilies;
-
-		std::vector<VkExtensionProperties> vecAvaliableDeviceExtensions;
-
-		int nRateScore;
-
-		std::optional<UINT> graphicFamilyIdx;
-		std::optional<UINT> presentFamilyIdx;
-
-		bool HaveGraphicAndPresentQueueFamily()
-		{
-			return graphicFamilyIdx.has_value() && presentFamilyIdx.has_value();
-		}
-
-		bool IsGraphicAndPresentQueueFamilySame()
-		{
-			return HaveGraphicAndPresentQueueFamily() && (graphicFamilyIdx == presentFamilyIdx);
-		}
-
-		SwapChainSupportInfo swapChainSupportInfo;
-
-		VkPhysicalDeviceMemoryProperties memoryProperties;
-	};
 	void QueryAllValidPhysicalDevice();
 	int RatePhysicalDevice(PhysicalDeviceInfo& deviceInfo);
 	void PickBestPhysicalDevice();
@@ -259,7 +259,7 @@ public:
 
 	VkExtent2D& GetSwapChainExtent2D() { return m_SwapChainExtent2D; }
 
-	VkImageView& GetUISwapChainImageView(UINT uiIdx) { return m_vecUISwapChainImageViews[uiIdx]; }
+	VkImageView& GetSwapChainImageView(UINT uiIdx) { return m_vecSwapChainImageViews[uiIdx]; }
 
 	VkCommandPool& GetTransferCommandPool() { return m_TransferCommandPool; }
 	VkCommandBuffer BeginSingleTimeCommandBuffer() { return BeginSingleTimeCommand(); }
@@ -269,7 +269,7 @@ public:
 
 	VkPipeline& GetPipeline() { return m_GraphicPipeline; }
 
-	VkFormat GetUISwapChainFormat() { return m_UISwapChainFormat; }
+	PhysicalDeviceInfo& GetPhysicalDeviceInfo() { return m_mapPhysicalDeviceInfo.at(m_PhysicalDevice); }
 
 private:
 	UINT m_uiWindowWidth;
@@ -312,12 +312,6 @@ private:
 
 	std::vector<VkImage> m_vecSwapChainImages;
 	std::vector<VkImageView> m_vecSwapChainImageViews;
-
-	VkSwapchainKHR m_UISwapChain;
-	std::vector<VkImage> m_vecUISwapChainImages;
-	std::vector<VkImageView> m_vecUISwapChainImageViews;
-	VkSurfaceFormatKHR m_UISwapChainSurfaceFormat;
-	VkFormat m_UISwapChainFormat;
 
 	VkImage m_DepthImage;
 	VkDeviceMemory m_DepthImageMemory;

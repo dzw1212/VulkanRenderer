@@ -13,11 +13,12 @@ class UI
 public:
 	UI() = default;
 
-	void Init(VulkanRenderer& renderer);
-	VkCommandBuffer& FillCommandBuffer(VulkanRenderer& renderer, UINT uiIdx);
-	void Render_Begin();
-	void Render_End();
+	void Init(VulkanRenderer* pRenderer);
+	void StartNewFrame();
+	void Draw();
+	VkCommandBuffer& FillCommandBuffer(UINT uiIdx);
 	void Clean();
 
-	void testSameRenderPass(VkCommandBuffer& commandBuffer);
+private:
+	VulkanRenderer* m_pRenderer;
 };
