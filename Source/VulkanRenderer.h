@@ -196,9 +196,9 @@ private:
 
 	struct UniformBufferObject
 	{
-		glm::mat4 model;
-		glm::mat4 view;
-		glm::mat4 proj;
+		glm::mat4* model;
+		glm::mat4* view;
+		glm::mat4* proj;
 	};
 	UINT FindSuitableMemoryTypeIndex(UINT typeFilter, VkMemoryPropertyFlags properties);
 
@@ -206,6 +206,8 @@ private:
 	void CreateBufferAndBindMemory(VkDeviceSize deviceSize, VkBufferUsageFlags usageFlags,
 		VkMemoryPropertyFlags propertyFlags, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void CreateUniformBuffers();
+
+	void CreateDynamicUniformBuffers();
 
 
 	void CreateTextureSampler();
@@ -336,6 +338,9 @@ private:
 
 	std::vector<VkBuffer> m_vecUniformBuffers;
 	std::vector<VkDeviceMemory> m_vecUniformBufferMemories;
+
+	std::vector<VkBuffer> m_vecDynamicUniformBuffers;
+	std::vector<VkDeviceMemory> m_vecDynamicUniformBufferMemories;
 
 	VkSampler m_TextureSampler;
 

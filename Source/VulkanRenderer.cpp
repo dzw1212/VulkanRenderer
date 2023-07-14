@@ -89,6 +89,8 @@ void VulkanRenderer::Init()
 
 	CreateShader();
 	CreateUniformBuffers();
+
+
 	CreateTextureSampler();
 
 	CreateTextureImageAndFillData();
@@ -1237,6 +1239,40 @@ void VulkanRenderer::CreateUniformBuffers()
 		CreateBufferAndBindMemory(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			m_vecUniformBuffers[i], m_vecUniformBufferMemories[i]);
+	}
+}
+
+void VulkanRenderer::CreateDynamicUniformBuffers()
+{
+	auto physicalDeviceProperties = m_mapPhysicalDeviceInfo.at(m_PhysicalDevice).properties;
+	size_t minUboAlignment = physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+	size_t dynamicAlignment = sizeof(glm::mat4) * 3; //model + view + proj
+	if (minUboAlignment > 0) {
+		dynamicAlignment = (dynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
+	}
+
+	size_t bufferSize = 9 * dynamicAlignment;
+
+	m_vecDynamicUniformBuffers.resize(m_vecSwapChainImages.size());
+	m_vecDynamicUniformBufferMemories.resize(m_vecSwapChainImages.size());
+
+	auto propertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	auto usageFlags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+	for (size_t i = 0; i < m_vecSwapChainImages.size(); ++i)
+	{
+		VkBufferCreateInfo BufferCreateInfo{};
+		BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferCreateInfo.size = bufferSize;
+		BufferCreateInfo.usage = usageFlags;
+		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		BufferCreateInfo.flags = 0;
+
+		VULKAN_ASSERT(vkCreateBuffer(m_LogicalDevice, &BufferCreateInfo, nullptr, &m_vecDynamicUniformBuffers[i]), "Create dynamic uniform buffer failed");
+
+		AllocateBufferMemory(propertyFlags, m_vecDynamicUniformBuffers[i], m_vecDynamicUniformBufferMemories[i]);
+
+		vkBindBufferMemory(m_LogicalDevice, m_vecDynamicUniformBuffers[i], m_vecDynamicUniformBufferMemories[i], 0);
 	}
 }
 
